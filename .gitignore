@@ -1,0 +1,10 @@
+**/.idea
+**/target/
+**/target/**
+*.iml
+*.jar
+**/.mvn
+**/.mvn/
+**/.mvn/**
+**/mvnw
+**/mvnw.cmd
