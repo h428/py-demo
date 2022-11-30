@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import matplotlib.pyplot as plt
+import os
 
 
 def load_dataset_cat_and_non_cat(print_dataset_info=False, prefix=""):
@@ -17,12 +18,12 @@ def load_dataset_cat_and_non_cat(print_dataset_info=False, prefix=""):
     """
 
     # 打开训练集数据文件，注意为 win 下写法，Linux 要修改
-    train_dataset = h5py.File(prefix + "datasets\\train_catvnoncat.h5", "r")
+    train_dataset = h5py.File(prefix + "datasets" + os.sep + "train_catvnoncat.h5", "r")
     train_set_x_orig = np.array(train_dataset["train_set_x"][:])  # your train set features
     train_set_y_orig = np.array(train_dataset["train_set_y"][:])  # your train set labels
 
     # 打开测试集数据文件，注意为 win 下写法，Linux 要修改
-    test_dataset = h5py.File(prefix + "datasets\\test_catvnoncat.h5", "r")
+    test_dataset = h5py.File(prefix + "datasets" + os.sep + "test_catvnoncat.h5", "r")
     test_set_x_orig = np.array(test_dataset["test_set_x"][:])  # your test set features
     test_set_y_orig = np.array(test_dataset["test_set_y"][:])  # your test set labels
 
@@ -53,11 +54,12 @@ def show_img(img):
     :param img: 图片数据，要求格式为 (w, h, 3)，其中 3 为 RGB 通道
     :return: 无
     """
-    plt.imshow(train_set_x_orig[img])
+    plt.imshow(img)
+    plt.show()
 
 
 if __name__ == '__main__':
     train_set_x_orig, train_set_y_orig, test_set_x_orig, test_set_y_orig, classes = \
-        load_dataset_cat_and_non_cat(True, "..\\")
+        load_dataset_cat_and_non_cat(True, ".." + os.sep)
     plt.imshow(train_set_x_orig[5])
     plt.show()
