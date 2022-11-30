@@ -12,3 +12,15 @@ def sigmoid(z):
     a = 1 / (1 + np.exp(-z))
 
     return a
+
+
+def min_max_normalization(array):
+    """
+    min-max 归一化
+    @param array: numpy ndarray
+    @return: 返回归一化后的数组
+    """
+    min_num = np.min(array) * 1.0
+    max_num = np.max(array) * 1.0
+    return (array - min_num) / (max_num - min_num)
+
