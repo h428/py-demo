@@ -2,18 +2,16 @@ import numpy as np
 from common.common_function import *
 
 
-
-
 class Logistic:
 
-    def __init__(self, train_set_x, train_set_y):
+    def __init__(self, x, y):
         """
-        @param train_set_x: 训练集数据，必须是一个 (n, m) 矩阵，每一列为一个样本
-        @param train_set_y: 训练集标签，必须是一个 (1, m) 矩阵，取值必须是 0 或 1（二分类标签）
+        @param x: 训练集数据，必须是一个 (m, n) 矩阵，每一列为一个样本
+        @param y: 训练集标签，必须是一个 (m, 1) 矩阵，取值必须是 0 或 1（二分类标签）
         """
 
-        self.x = train_set_x
-        self.y = train_set_y
+        self.x = x.T
+        self.y = y.T
 
         # 训练样本数量
         self.m_train = self.x.shape[1]
@@ -69,6 +67,7 @@ class Logistic:
         self.__optimize(num_iterations, learning_rate)
 
     def predict(self, test_x: np.ndarray):
+        test_x = self.__make_sure_data_stack_by_column(test_x)
         m_test = test_x.shape[1]
         y_prediction = np.zeros((1, m_test))
         a = sigmoid(np.dot(self.w.T, test_x) + self.b)
@@ -83,5 +82,27 @@ class Logistic:
     def predict_and_compare(self, test_x, test_y):
         y_prediction_train = self.predict(self.x)
         y_prediction = self.predict(test_x)
+        test_y = self.__make_sure_data_stack_by_column(test_y)
         print("train accuracy: {} %".format(100 - np.mean(np.abs(y_prediction_train - self.y)) * 100))
         print("test accuracy: {} %".format(100 - np.mean(np.abs(y_prediction - test_y)) * 100))
+
+    def __make_sure_data_stack_by_column(self, array):
+        """
+        确保样本（包括输入 x 和标签 y）是按列堆叠的
+        @param array:
+        @return:
+        """
+
+        # 非标准向量则直接 reshape 为标准行向量（处理 y）
+        if array.ndim == 1:
+            return array.reshape(1, -1)
+
+        # 列向量则直接转为行向量（处理 y）
+        if array.shape[1] == 1:
+            return array.T
+
+        # 输入测试样本是按行堆叠的，需要转置为按列堆叠（处理 x）
+        if array.shape[1] == self.n_x and array.shape[0] != self.n_x:
+            return array.T
+
+        return array
