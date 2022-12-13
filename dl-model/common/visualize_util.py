@@ -41,7 +41,6 @@ def plot_decision_boundary(model, x, y):
     plt.show()
 
 
-if __name__ == '__main__':
-    dataset = dataset_loader.load_dataset_cat_and_non_cat(True, ".." + os.sep)
-    plt.imshow(dataset.x[5])
+def scatter2d(x1, x2, z):
+    plt.scatter(x1, x2, c=z, s=40, cmap=plt.cm.Spectral)
     plt.show()

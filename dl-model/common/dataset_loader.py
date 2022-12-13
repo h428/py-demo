@@ -2,21 +2,63 @@ import os
 
 import h5py
 import numpy as np
+import sklearn
+import sklearn.datasets
+import common.data_util as data_util
+import common.visualize_util as visualize_util
 
 
 class DataSet:
+    """
+    DataSet 相关说明如下：
+    1. 约定数据按行堆叠，即第一维度表示样本数量
+    2. 所有数据预处理会影响自身数据，且返回 self 以便能够以链式方式进行调用
+    """
 
     def __init__(self, x, y, test_x=None, test_y=None, classes_info=None):
-        # 训练样本
-        self.x = x
-        # 训练标签
-        self.y = y
-        # 测试样本
-        self.test_x = test_x
-        # 测试标签
-        self.test_y = test_y
+        self.x = data_util.vec2col(x)  # 训练样本，规模为 (m, n_x)，如果只有单个特征，确保按行堆叠
+        self.y = data_util.vec2col(y)  # 训练标签，规模为 (m, 1)，如果样本只有一个标签，确保按行堆叠
+
+        m = self.x.shape[0]  # 样本数量
+        assert m == self.y.shape[0]  # 确保 y 的样本数量一致
+
+        self.has_test = test_x is not None and test_y is not None
+
+        if self.has_test:
+            # 测试样本
+            self.test_x = data_util.vec2col(test_x)
+            # 测试标签
+            self.test_y = data_util.vec2col(test_y)
+
+            assert self.test_x.shape[0] == self.test_y.shape[0]
+
         # 标签的文本解释
         self.classes_info = classes_info
+
+    def flatten_x(self):
+        """
+        拉平 x，将第一位看做样本数量 m，后续的全看成某个样本的特征 n_x，拉平为 (m, n_x) 矩阵
+        @return: 链式编程需要返回 self
+        """
+        self.x = data_util.flatten_data(self.x)
+        if self.has_test:
+            self.test_x = data_util.flatten_data(self.test_x)
+        return self
+
+    def min_max(self):
+        """
+        对数据进行 min_max 归一化
+        @return:
+        """
+        self.x = data_util.min_max_normalization(self.x)
+        self.test_x = data_util.min_max_normalization(self.test_x)
+        return self
+
+    def divide(self, maximum):
+        self.x = self.x / maximum
+        if self.has_test:
+            self.test_x = self.test_x / maximum
+        return self
 
 
 def load_dataset_cat_and_non_cat(print_dataset_info=False, prefix=""):
@@ -90,3 +132,32 @@ def load_planar_dataset():
         y[ix] = j  # 第 j 类标签，0 为红点，1 为蓝点
 
     return DataSet(x, y)  # 返回数据集
+
+
+def load_extra_datasets():
+    """
+    加载 sklearn 提供的 4 个常用的二维坐标形状数据集和一个完全随机的二维坐标点数据集
+
+    其中 blobs 数据集具有多个分类，可用于测试多分类任务，若想用于二分类，可以采用 Y = Y%2 设置 Y 后用于训练；
+
+    no_structure 数据集则为随机点，基本无法绘制一个合适的决策边界
+
+    @return: 五个数据集组成的元组，x.shape = (m, 2), y.shape = (m. 1)
+    """
+    n = 200
+    half = n // 2
+    noisy_circles = sklearn.datasets.make_circles(n_samples=n, factor=.5, noise=.3)
+    noisy_moons = sklearn.datasets.make_moons(n_samples=n, noise=.2)
+    blobs = sklearn.datasets.make_blobs(n_samples=n, random_state=5, n_features=2, centers=6)
+    gaussian_quantiles = sklearn.datasets.make_gaussian_quantiles(mean=None, cov=0.5, n_samples=n, n_features=2,
+                                                                  n_classes=2, shuffle=True, random_state=None)
+    no_structure = np.random.rand(n, 2), np.r_[np.zeros(half), np.ones(n - half)]
+
+    return DataSet(noisy_circles[0], noisy_circles[1]), DataSet(noisy_moons[0], noisy_moons[1]), \
+           DataSet(blobs[0], blobs[1]), DataSet(gaussian_quantiles[0], gaussian_quantiles[1]), \
+           DataSet(no_structure[0], no_structure[1])
+
+
+if __name__ == '__main__':
+    ds = load_dataset_cat_and_non_cat(prefix="../")
+    visualize_util.show_img(ds.x[7])

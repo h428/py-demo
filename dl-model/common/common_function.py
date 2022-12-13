@@ -14,17 +14,15 @@ def sigmoid(z):
     return a
 
 
-def min_max_normalization(array, axis=0):
+def relu(z):
     """
-    min-max 归一化
-    @param array: numpy ndarray
-    @param axis: 维度
-    @return: 返回归一化后的数组
+    relu 函数实现
+    @param z:
+    @return:
     """
-    min_num = np.min(array, axis=axis) * 1.0
-    max_num = np.max(array, axis=axis) * 1.0
-    delta = (max_num - min_num)
-    # if axis == 1:
-    #     min_num = min_num.reshape(-1, 1)
-    #     delta = delta.reshape(-1, 1)
-    return (array - min_num) / delta
+
+    a = np.maximum(0, z)
+
+    assert (a.shape == z.shape)
+
+    return a
