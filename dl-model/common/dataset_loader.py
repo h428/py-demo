@@ -6,6 +6,7 @@ import sklearn
 import sklearn.datasets
 import common.data_util as data_util
 import common.visualize_util as visualize_util
+import scipy.io
 
 
 class DataSet:
@@ -20,7 +21,8 @@ class DataSet:
         self.y = data_util.vec2col(y)  # 训练标签，规模为 (m, 1)，如果样本只有一个标签，确保按行堆叠
 
         m = self.x.shape[0]  # 样本数量
-        assert m == self.y.shape[0]  # 确保 y 的样本数量一致
+        n_x = np.prod(self.x.shape[1:])  # 样本特征数量
+        assert m == self.y.shape[0], "训练样本 y 的数量和 x 的数量不一致"
 
         self.has_test = test_x is not None and test_y is not None
 
@@ -30,10 +32,24 @@ class DataSet:
             # 测试标签
             self.test_y = data_util.vec2col(test_y)
 
-            assert self.test_x.shape[0] == self.test_y.shape[0]
+            assert self.test_x.shape[0] == self.test_y.shape[0], "测试样本 y 的数量和 x 的数量不一致"
+            assert n_x == np.prod(self.test_x.shape[1:]), "测试样本的特征数量和训练样本的特征数量不一致"
 
         # 标签的文本解释
         self.classes_info = classes_info
+
+    def print_dataset_info(self):
+        m_train = self.x.shape[0]
+        n_x = np.prod(self.x.shape[1:])
+        print("训练样本数量：" + str(m_train))
+        print("单个样本形状 %s，特征数量为 %s" % (str(self.x.shape[1:]), str(n_x)))
+        print("训练样本 x 形状：" + str(self.x.shape))
+        print("训练样本 y 形状：" + str(self.y.shape))
+
+        if self.has_test:
+            print("测试样本数量: " + str(self.test_x.shape[0]))
+            print("测试样本 x 形状：" + str(self.test_x.shape))
+            print("测试样本 y 形状：" + str(self.test_y.shape))
 
     def flatten_x(self):
         """
@@ -59,6 +75,9 @@ class DataSet:
         if self.has_test:
             self.test_x = self.test_x / maximum
         return self
+
+    def scatter2d(self):
+        visualize_util.scatter2d(self.x[:, 0], self.x[:, 1], self.y)
 
 
 def load_dataset_cat_and_non_cat(print_dataset_info=False, prefix=""):
@@ -87,19 +106,6 @@ def load_dataset_cat_and_non_cat(print_dataset_info=False, prefix=""):
 
     train_set_y_orig = train_set_y_orig.reshape(-1, 1)
     test_set_y_orig = test_set_y_orig.reshape(-1, 1)
-
-    if print_dataset_info:
-        m_train = train_set_x_orig.shape[0]
-        m_test = test_set_x_orig.shape[0]
-        num_px = train_set_x_orig.shape[1]
-        print("Number of training examples: m_train = " + str(m_train))
-        print("Number of testing examples: m_test = " + str(m_test))
-        print("Height/Width of each image: num_px = " + str(num_px))
-        print("Each image is of size: (" + str(num_px) + ", " + str(num_px) + ", 3)")
-        print("train_set_x shape: " + str(train_set_x_orig.shape))
-        print("train_set_y shape: " + str(train_set_y_orig.shape))
-        print("test_set_x shape: " + str(test_set_x_orig.shape))
-        print("test_set_y shape: " + str(test_set_y_orig.shape))
 
     return DataSet(train_set_x_orig, train_set_y_orig, test_set_x_orig, test_set_y_orig, classes)
 
@@ -134,6 +140,16 @@ def load_planar_dataset():
     return DataSet(x, y)  # 返回数据集
 
 
+def load_ellipse_dataset():
+    np.random.seed(1)
+    train_X, train_Y = sklearn.datasets.make_circles(n_samples=300, noise=.05)
+    np.random.seed(2)
+    test_X, test_Y = sklearn.datasets.make_circles(n_samples=100, noise=.05)
+    train_Y = train_Y.reshape(-1, 1)
+    test_Y = test_Y.reshape(-1, 1)
+    return DataSet(train_X, train_Y, test_X, test_Y)
+
+
 def load_extra_datasets():
     """
     加载 sklearn 提供的 4 个常用的二维坐标形状数据集和一个完全随机的二维坐标点数据集
@@ -153,11 +169,36 @@ def load_extra_datasets():
                                                                   n_classes=2, shuffle=True, random_state=None)
     no_structure = np.random.rand(n, 2), np.r_[np.zeros(half), np.ones(n - half)]
 
-    return DataSet(noisy_circles[0], noisy_circles[1]), DataSet(noisy_moons[0], noisy_moons[1]), \
-           DataSet(blobs[0], blobs[1]), DataSet(gaussian_quantiles[0], gaussian_quantiles[1]), \
-           DataSet(no_structure[0], no_structure[1])
+    return (DataSet(noisy_circles[0], noisy_circles[1]), DataSet(noisy_moons[0], noisy_moons[1]),
+            DataSet(blobs[0], blobs[1]), DataSet(gaussian_quantiles[0], gaussian_quantiles[1]),
+            DataSet(no_structure[0], no_structure[1]))
+
+
+def load_french_player_shoot_position_dataset(prefix=""):
+    """
+    法国足球队员射门数据，(x, y)
+        - x 射门位置，(x1, x2) 是一个坐标
+        - y 可取值为 0/1，0（红点）表示敌方队伍，1（蓝点）表示法国队伍
+
+    数据来源于吴恩达深度学习/C2/改善深层神经网络课后作业
+
+    @param prefix:
+    @return:
+    """
+    data = scipy.io.loadmat(prefix + 'datasets/data.mat')
+    train_X = data['X']
+    train_Y = data['y']
+    test_X = data['Xval']
+    test_Y = data['yval']
+
+    # plt.scatter(train_X[0, :], train_X[1, :], c=train_Y, s=40, cmap=plt.cm.Spectral);
+
+    return DataSet(train_X, train_Y, test_X, test_Y)
 
 
 if __name__ == '__main__':
-    ds = load_dataset_cat_and_non_cat(prefix="../")
-    visualize_util.show_img(ds.x[7])
+    ds = load_french_player_shoot_position_dataset(prefix="../")
+    # ds, _, _, _, _ = load_extra_datasets()
+    # visualize_util.scatter2d(ds.x[:, 0], ds.x[:, 1], ds.y)
+    ds.print_dataset_info()
+    ds.scatter2d()

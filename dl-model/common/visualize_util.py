@@ -23,9 +23,27 @@ def plot_decision_boundary(model, x, y):
     @return: None
     """
     # 求出横坐标 x1 的最小值、最大值，确定 x 坐标轴范围
-    x_min, x_max = x[:, 0].min() - 1, x[:, 0].max() + 1
+    x_min, x_max = x[:, 0].min(), x[:, 0].max()
     # 求出纵坐标 x2 的最小值、最大值，确定 y 坐标轴范围
-    y_min, y_max = x[:, 1].min() - 1, x[:, 1].max() + 1
+    y_min, y_max = x[:, 1].min(), x[:, 1].max()
+
+    # 如果数值区间较小，要特殊处理下边界
+    if x_min < 1 and x_max < 1:
+        length = x_max - x_min
+        x_min = x_min - length / 10
+        x_max = x_max + length / 10
+    else:
+        x_min -= 1
+        x_max += 1
+
+    if y_min < 1 and y_max < 1:
+        length = y_max - y_min
+        y_min = y_min - length / 10
+        y_max = y_max + length / 10
+    else:
+        y_min -= 1
+        y_max += 1
+
     h = 0.01
     # 使用 np.meshgrid 交叉生成网格数据矩阵，h 为步长，xx 为样本横坐标，yy 为样本纵坐标
     xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
@@ -33,14 +51,22 @@ def plot_decision_boundary(model, x, y):
     z = model(np.c_[xx.ravel(), yy.ravel()])
     z = z.reshape(xx.shape)  # 调整输出的形状
     # 以 Spectral 形式，根据 Z 值绘制等高线，根据 z 值不同从而形成决策边界
+    # axes = plt.subplot(111)
     plt.contourf(xx, yy, z, cmap=plt.cm.Spectral)
-    plt.ylabel('x2')
-    plt.xlabel('x1')
+    plt.xlabel("x1")
+    plt.ylabel("x2")
     # 同样以 Spectral 形式，根据 y 的分类绘制原始坐标点，
     plt.scatter(x[:, 0], x[:, 1], c=y, cmap=plt.cm.Spectral)
     plt.show()
 
 
 def scatter2d(x1, x2, z):
+    """
+    绘制散点图
+    @param x1: 横坐标向量
+    @param x2: 纵坐标向量
+    @param z: 分类值，不同分类颜色会不一样
+    @return: None
+    """
     plt.scatter(x1, x2, c=z, s=40, cmap=plt.cm.Spectral)
     plt.show()

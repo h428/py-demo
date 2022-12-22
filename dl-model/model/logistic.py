@@ -1,108 +1,75 @@
 import numpy as np
-from common.common_function import *
+from common.model_util import *
+import common.dataset_util as dataset_util
 
 
 class Logistic:
 
-    def __init__(self, x, y):
-        """
-        @param x: 训练集数据，必须是一个 (m, n) 矩阵，每一列为一个样本
-        @param y: 训练集标签，必须是一个 (m, 1) 矩阵，取值必须是 0 或 1（二分类标签）
-        """
+    def __init__(self):
+        self.w = None  # 特征向量
+        self.b = 0  # 偏置
+        self.costs = []  # 代价
 
-        self.x = x.T
-        self.y = y.T
+    def train(self, X, Y, num_iterations, learning_rate, print_cost=False):
+        X, Y, m = dataset_util.dataset_stack_by_row_to_stack_by_column(X, Y)
+        n_x = X.shape[0]
+        w, b = Logistic.init_parameters(n_x)
+        self.w, self.b, self.costs = Logistic.optimize(w, b, X, Y, num_iterations, learning_rate, print_cost)
 
-        # 训练样本数量
-        self.m_train = self.x.shape[1]
-        # 单样本特征数量
-        self.n_x = self.x.shape[0]
-        # 特征向量
-        self.w = np.zeros((self.n_x, 1))
-        # 偏置
-        self.b = 0
-        # 代价
-        self.costs = []
+    def test(self, X, Y):
+        X, Y, _ = dataset_util.dataset_stack_by_row_to_stack_by_column(X, Y)
+        Logistic.predict(self.w, self.b, X, Y)
 
-    def zeros(self):
-        # 特征向量
-        self.w = np.zeros((self.n_x, 1)).reshape(self.n_x, 1)
-        # 偏置
-        self.b = 0
-        # 代价
-        self.costs = []
+    @staticmethod
+    def init_parameters(n_x):
+        w = np.zeros((n_x, 1)).reshape(n_x, 1)  # 特征向量
+        b = 0  # 偏置
+        return w, b
 
-    def __propagate(self):
-        a = sigmoid(np.dot(self.w.T, self.x) + self.b)
-        cost = np.sum(self.y * np.log(a) + (1 - self.y) * np.log(1 - a)) / - self.m_train
-        dz = a - self.y
-        dw = np.dot(self.x, dz.T) / self.m_train
-        db = np.sum(dz) / self.m_train
+    @staticmethod
+    def propagate_and_backward(w, b, X, Y):
+        m = X.shape[1]  # 样本数
+        A = sigmoid(np.dot(w.T, X) + b)
+        cost = np.sum(Y * np.log(A) + (1 - Y) * np.log(1 - A)) / -m
+        dZ = A - Y
+        dw = np.dot(X, dZ.T) / m
+        db = np.sum(dZ) / m
 
-        assert (dw.shape == self.w.shape)
+        assert (dw.shape == w.shape)
         assert (db.dtype == float)
         cost = np.squeeze(cost)
         assert (cost.shape == ())
 
         return dw, db, cost
 
-    def __optimize(self, num_iterations, learning_rate, print_cost=False):
+    @staticmethod
+    def optimize(w, b, X, Y, num_iterations, learning_rate, print_cost=False):
+        costs = []
 
         for i in range(num_iterations):
+            dw, db, cost = Logistic.propagate_and_backward(w, b, X, Y)
 
-            dw, db, cost = self.__propagate()
-
-            self.w = self.w - learning_rate * dw
-            self.b = self.b - learning_rate * db
+            w = w - learning_rate * dw
+            b = b - learning_rate * db
 
             if i % 100 == 0:
-                self.costs.append(cost)
+                costs.append(cost)
 
-            # Print the cost every 100 training examples
+            # 每 100 步打印一下 cost 值
             if print_cost and i % 100 == 0:
-                print("Cost after iteration %i: %f" % (i, cost[0]))
+                print("Cost after iteration %i: %s" % (i, str(cost)))
 
-    def train(self, num_iterations, learning_rate, print_cost=False):
-        self.zeros()
-        self.__optimize(num_iterations, learning_rate)
+        return w, b, costs
 
-    def predict(self, test_x: np.ndarray):
-        test_x = self.__make_sure_data_stack_by_column(test_x)
-        m_test = test_x.shape[1]
-        y_prediction = np.zeros((1, m_test))
-        a = sigmoid(np.dot(self.w.T, test_x) + self.b)
+    @staticmethod
+    def predict(w, b, X, Y):
+        m = X.shape[1]  # 计算样本数
+        a = sigmoid(np.dot(w.T, X) + b)  # 执行前向传播进行预测
+        y_prediction = np.zeros((1, m))  # 默认预测为 0
+        y_prediction[a > 0.5] = 1  # 概率大于 0.5 预测为 1
 
-        y_prediction[a > 0.5] = 1
-        y_prediction[a <= 0.5] = 0
+        print("accuracy: {} %".format(100 - np.mean(np.abs(y_prediction - Y)) * 100))
 
-        assert (y_prediction.shape == (1, m_test))
+        assert (y_prediction.shape == (1, m))
 
         return y_prediction
-
-    def predict_and_compare(self, test_x, test_y):
-        y_prediction_train = self.predict(self.x)
-        y_prediction = self.predict(test_x)
-        test_y = self.__make_sure_data_stack_by_column(test_y)
-        print("train accuracy: {} %".format(100 - np.mean(np.abs(y_prediction_train - self.y)) * 100))
-        print("test accuracy: {} %".format(100 - np.mean(np.abs(y_prediction - test_y)) * 100))
-
-    def __make_sure_data_stack_by_column(self, array):
-        """
-        确保样本（包括输入 x 和标签 y）是按列堆叠的
-        @param array:
-        @return:
-        """
-
-        # 非标准向量则直接 reshape 为标准行向量（处理 y）
-        if array.ndim == 1:
-            return array.reshape(1, -1)
-
-        # 列向量则直接转为行向量（处理 y）
-        if array.shape[1] == 1:
-            return array.T
-
-        # 输入测试样本是按行堆叠的，需要转置为按列堆叠（处理 x）
-        if array.shape[1] == self.n_x and array.shape[0] != self.n_x:
-            return array.T
-
-        return array

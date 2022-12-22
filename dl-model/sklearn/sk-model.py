@@ -13,7 +13,7 @@ def logistic_demo():
     # 喂养数据进行训练，其中 x 为 (m, 2) 矩阵，对于 y，sklearn 要求必须是非标准向量，故使用切片处理
     clf.fit(ds.x, ds.y[:, 0])
     # 绘制决策边界
-    visualize_util.plot_decision_boundary(lambda x: clf.predict(x), ds.x, ds.y[:, 0])
+    visualize_util.plot_decision_boundary(lambda x: clf.test(x), ds.x, ds.y[:, 0])
 
 
 if __name__ == '__main__':
