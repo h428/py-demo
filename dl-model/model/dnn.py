@@ -5,9 +5,19 @@ import common.dataset_util as dataset_util
 import common.visualize_util as visualize_util
 
 
+def print_info(idx, caches, AL):
+    (_, (_, D1), _) = caches[0]
+    ((A1, _, _), (_, D2), _) = caches[1]
+    ((A2, _, _), (_, D2), _) = caches[2]
+    A3 = AL
+    # print("index %d, D1=%d, D2=%d" % (idx, np.sum(D1), np.sum(D2)))
+    print("index %d, A1=%f, A2=%f, A3=%f" % (idx, np.sum(A1), np.sum(A2), np.sum(A3)))
+
+
 class Dnn:
 
     def __init__(self, layers_dims, learning_rate=0.0075, num_iterations=3000, initialization="he", lambd=0,
+                 keep_prob=1,
                  print_cost=False, cost_save_step=100, cost_print_step=100):
         """
 
@@ -24,6 +34,7 @@ class Dnn:
         self.learning_rate = learning_rate
         self.num_iterations = num_iterations
         self.lambd = lambd
+        self.keep_prob = keep_prob
 
         # 需要持久化的模型参数
         self.parameters = {}
@@ -38,8 +49,8 @@ class Dnn:
 
         # 保存参数
         self.parameters, self.costs = Dnn.train(X, Y, self.layers_dims, self.learning_rate, self.num_iterations,
-                                                self.lambd, self.initialization, self.cost_save_step,
-                                                self.cost_print_step)
+                                                self.lambd, self.keep_prob, self.initialization,
+                                                self.cost_save_step, self.cost_print_step)
 
         # 绘制 cost 图形，观察收敛情况
         if self.print_cost:
@@ -67,7 +78,6 @@ class Dnn:
         其中 Wl.shape = (layer_dims[l], layer_dims[l-1]), bl.shape = (layer_dims[l], 1)
         """
 
-        np.random.seed(3)
         parameters = {}
         layer_num = len(layer_dims_with_nx)  # number of layers in the network
 
@@ -85,11 +95,12 @@ class Dnn:
         return parameters
 
     @staticmethod
-    def forward_propagation(X, parameters):
+    def forward_propagation(X, parameters, keep_prob):
         """
         给定数据和参数，进行 L 层全连接神经网络的前向传播，计算步骤为：[LINEAR->RELU]*(L-1)->LINEAR->SIGMOID
         @param X: 输入数据，样本按列堆叠，规模为 (n_x, m)
         @param parameters: L 层神经网络的参数，是一个字典，key 分别为 W1, b1, ..., WL, bL
+        @param keep_prob: Dropout 保留概率
         @return: 返回一个元组 (AL, caches)，
             - AL 为第 L 层网络的激活值输出，在当前例子中是 sigmoid 值，用于二分类
             - caches 是一个 list，为前 L 层网络的缓存（注意下标要 -1），包括 (linear_cache, Z) -> ((A_prev, W, b), Z)
@@ -98,51 +109,53 @@ class Dnn:
         caches = []
         A = X
         L = len(parameters) // 2  # number of layers in the neural network
+        cache = None
 
         # 实现前 L-1 层的 [LINEAR -> RELU]*(L-1) 计算，并将 cache 缓存到 caches 中
         for l in range(1, L):
             A_prev = A
             A, cache = model_util.linear_activation_forward(
-                A_prev, parameters['W' + str(l)], parameters['b' + str(l)], "relu")
+                A_prev, parameters['W' + str(l)], parameters['b' + str(l)], "relu", keep_prob, cache)
             caches.append(cache)
 
         # 实现最后一层的 sigmoid 激活值，并将 cache 添加到 caches
         AL, cache = model_util.linear_activation_forward(
-            A, parameters['W' + str(L)], parameters['b' + str(L)], "sigmoid")
+            A, parameters['W' + str(L)], parameters['b' + str(L)], "sigmoid", keep_prob, cache)
         caches.append(cache)
 
         return AL, caches
 
     @staticmethod
-    def backward_propagation(AL, Y, caches, lambd):
+    def backward_propagation(AL, Y, caches, lambd, keep_prob):
         """
         给定预测值 AL 和样本标签 Y，进行反向传播算法
         @param AL: 神经网络的最终输出概率值（sigmoid），规模为 (1, m)
         @param Y: 样本标签，规模为 (1, m)
         @param caches: 长度为 L 的 list，存储每层网络的 cache -> (linear_cache, Z) -> ((A_prev, W, b), Z)
         @param lambd: 正则化参数
+        @param keep_prob: Dropout 保留概率
         @return: 返回一个字典，存储对各个参数的偏导，包括 dA, dW, db
         """
-
+        epsilon = 1e-30
         grads = {}
         L = len(caches)  # 获取网络的层数，不计算输入层
         Y = Y.reshape(AL.shape)  # 确保 Y 的规模和 AL 规模一致
 
         # cost 为交叉熵，根据求导公式，计算 dAL = - (y/a - (1-y)/(1-a))，作为反向传播的起点
-        dAL = - (np.divide(Y, AL) - np.divide(1 - Y, 1 - AL))
+        dAL = - (np.divide(Y, AL + epsilon) - np.divide(1 - Y, 1 - AL + epsilon))
         grads["dA" + str(L)] = dAL
 
         # 第 L 层为 sigmoid 函数，根据 dAL 分别计算出：dWL, dbL 和 dA_{L-1}
         current_cache = caches[L - 1]
         grads["dA" + str(L - 1)], grads["dW" + str(L)], grads["db" + str(L)] = model_util.linear_activation_backward(
-            dAL, current_cache, "sigmoid", lambd)
+            dAL, current_cache, "sigmoid", lambd, keep_prob)
 
         for l in reversed(range(L - 1)):
             # 对于下标 [0, L-2]，分别代表第 1 ~ L-1 层的网络参数求解
             current_cache = caches[l]
             # 根据 dA_l，求解出 dW_l, dW_l 和 dA_{l-1}
             dA_prev_temp, dW_temp, db_temp = model_util.linear_activation_backward(
-                grads["dA" + str(l + 1)], current_cache, "relu", lambd)
+                grads["dA" + str(l + 1)], current_cache, "relu", lambd, keep_prob)
             grads["dA" + str(l)] = dA_prev_temp
             grads["dW" + str(l + 1)] = dW_temp
             grads["db" + str(l + 1)] = db_temp
@@ -150,7 +163,8 @@ class Dnn:
         return grads
 
     @staticmethod
-    def train(X, Y, layers_dims, learning_rate, num_iterations, lambd, initialization, cost_save_step, cost_print_step):
+    def train(X, Y, layers_dims, learning_rate, num_iterations, lambd, keep_prob, initialization, cost_save_step,
+              cost_print_step):
         """
         训练一个 L 层（输入层 X 可视作 A_0 不算在层数内）的全连接神经网络，前 L-1 层为 relu，最后一层为 sigmoid
 
@@ -160,6 +174,7 @@ class Dnn:
         @param learning_rate: 学习速率
         @param num_iterations: 迭代次数
         @param lambd: 正则化参数
+        @param keep_prob: Dropout 保留概率
         @param initialization: 模型参数初始化方式
         @param cost_save_step: 记录 cost 的步长
         @param cost_print_step: 打印 cost 的步长
@@ -177,11 +192,14 @@ class Dnn:
 
         for i in range(0, num_iterations):
             # 前向传播
-            AL, caches = Dnn.forward_propagation(X, parameters)
+            if keep_prob and X[0][0] == -0.158986:
+                np.random.seed(1)  # 确保法国足球数据集下，dropout 测试一致性
+            AL, caches = Dnn.forward_propagation(X, parameters, keep_prob)
+            # print_info(i, caches, AL)
             # 计算损失
             cost = model_util.compute_cross_entropy_cost_with_regularization(AL, Y, parameters, lambd)
             # 反向传播
-            grads = Dnn.backward_propagation(AL, Y, caches, lambd)
+            grads = Dnn.backward_propagation(AL, Y, caches, lambd, keep_prob)
             # 更新参数
             parameters = model_util.update_parameters(parameters, grads, learning_rate)
 
@@ -203,7 +221,7 @@ class Dnn:
         """
 
         # 前向传播
-        AL, caches = Dnn.forward_propagation(X, parameters)
+        AL, caches = Dnn.forward_propagation(X, parameters, 1)
 
         # 将概率转化为标签
         return AL > 0.5

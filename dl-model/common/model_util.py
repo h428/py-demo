@@ -43,13 +43,15 @@ def linear_forward(A, W, b):
     return Z, cache
 
 
-def linear_activation_forward(A_prev, W, b, activation):
+def linear_activation_forward(A_prev, W, b, activation, keep_prob, cache_prev):
     """
     实现单层的前向传播 LINEAR->ACTIVATION ，包括线性计算和激活函数： A[l] = g(np.dot(W, A[l-1]) + b[l])，g(z) 为激活函数
     @param A_prev: 前一层的激活值，规模为 (n[l-1], m)
     @param W: 当前层的参数矩阵，规模为 (n[l], n[l-1])
     @param b: 当前层的偏置，规模为 (n[l], 1)
     @param activation: 当前层的激活函数类型，支持 relu 和 sigmoid
+    @param keep_prob: Dropout 保留概率
+    @param cache_prev: 前一层的缓存，为了实现 Dropout 而引入的
     @return: 是一个元组 (A, cache)
         - A 为返回当前层的激活值输出，规模为 (n[l], m)
         - cache 为当前层的缓存，包括 (linear_cache, activation_cache)，其中 linear_cache = (A_prev, W, b)，activation_cache = Z
@@ -59,13 +61,23 @@ def linear_activation_forward(A_prev, W, b, activation):
         # 计算 sigmoid(np.dot(W, X) + b)
         Z, linear_cache = linear_forward(A_prev, W, b)
         A = sigmoid(Z)
+        # sigmoid 为输出层，不需要 Dropout，在反向传播时也可以基于 D 判断该层需不需要 Dropout
+        D = None
     else:
         # 默认为 relu，计算 relu(np.dot(W, X) + b)
         Z, linear_cache = linear_forward(A_prev, W, b)
         A = relu(Z)
+        # Dropout 计算
+        D = np.random.rand(*A.shape) < keep_prob
+        A = A * D / keep_prob
 
     assert (A.shape == (W.shape[0], A_prev.shape[1]))
-    cache = (linear_cache, Z)
+    activation_cache = (Z, D)
+    if cache_prev:
+        (_, (_, D_prev), _) = cache_prev
+    else:
+        D_prev = 1
+    cache = (linear_cache, activation_cache, D_prev)
 
     return A, cache
 
@@ -79,13 +91,11 @@ def compute_cross_entropy_cost(AL, Y):
     """
 
     m = Y.shape[1]
+    epsilon = 1e-30
 
     # 计算交叉熵
-    cost = (1. / m) * (-np.dot(Y, np.log(AL).T) - np.dot(1 - Y, np.log(1 - AL).T))
-
-    # 移除 ndarray 无用的壳，确保是一个浮点数
-    cost = np.squeeze(cost)
-    assert (cost.shape == ())
+    log_prob = np.multiply(-np.log(AL + epsilon), Y) + np.multiply(-np.log(1 - AL + epsilon), 1 - Y)
+    cost = 1. / m * np.nansum(log_prob)
 
     return cost
 
@@ -125,7 +135,7 @@ def relu_backward(dA, cache):
     @return: 对当前层 Z 的偏导 dZ
     """
 
-    Z = cache
+    Z, _ = cache
     dZ = np.array(dA, copy=True)  # 拷贝一份 dA 作为 dZ
 
     # 由于 relu 函数的偏导不是 0 就是 1，根据链式法则和 dZ 相乘后，只需把 Z < 0 的元素的偏导变为 0 即可
@@ -144,7 +154,7 @@ def sigmoid_backward(dA, cache):
     @return: 对当前层 Z 的偏导 dZ
     """
 
-    Z = cache
+    Z, _ = cache
 
     # 根据 Z 重新计算出当前层的 A，用于后续求偏导，因为 sigmoid 的偏导要用到
     s = 1 / (1 + np.exp(-Z))
@@ -189,25 +199,30 @@ def linear_backward(dZ, cache, lambd):
     return dA_prev, dW, db
 
 
-def linear_activation_backward(dA, cache, activation, lambd):
+def linear_activation_backward(dA, cache, activation, lambd, keep_prob):
     """
     实现单层神经网络（包括线性计算和激活层）的反向传播
     @param dA: 当前层的激活偏导 dA
     @param cache: 当前层的缓存，包括 (linear_cache, Z) -> ((A_prev, W, b), Z)
     @param activation: 当前层激活函数的类型，relu 或 sigmoid
     @param lambd: 正则化系数
+    @param keep_prob: Dropout 保留概率
     @return: 返回一个元组，包括 dA_prev, dW, db
     """
 
-    linear_cache, activation_cache = cache
+    linear_cache, activation_cache, D_prev = cache
 
     if activation == "sigmoid":
         dZ = sigmoid_backward(dA, activation_cache)
         dA_prev, dW, db = linear_backward(dZ, linear_cache, lambd)
+        dA_prev = np.multiply(dA_prev, D_prev)
+        dA_prev = dA_prev / keep_prob
     else:
         # 默认为 relu
         dZ = relu_backward(dA, activation_cache)
         dA_prev, dW, db = linear_backward(dZ, linear_cache, lambd)
+        dA_prev = np.multiply(dA_prev, D_prev)
+        dA_prev = dA_prev / keep_prob
 
     return dA_prev, dW, db
 

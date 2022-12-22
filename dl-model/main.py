@@ -71,7 +71,7 @@ def planar_dnn_demo():
     ds.scatter2d()
 
 
-def french_player_shoot_demo():
+def french_player_shoot_l2_demo():
     """
     法国足球队数据样例，来自 C2/Week1/正则化
     @return:
@@ -87,8 +87,38 @@ def french_player_shoot_demo():
     dnn.test(ds.x, ds.y, "train set")
     dnn.test(ds.test_x, ds.test_y, "test set")
     dnn.plot_decision_boundary(ds.x, ds.y)
+    # Cost after iteration 0: 0.6974484493131264
+    # Cost after iteration 10000: 0.2684918873282239
+    # Cost after iteration 20000: 0.2680916337127301
+    # train set's Accuracy: 0.9383886255924171
+    # test set's Accuracy: 0.9299999999999998
+
+
+def french_player_shoot_dropout_demo():
+    """
+    法国足球队数据样例，来自 C2/Week1/正则化
+    @return:
+    """
+    ds = dataset_loader.load_french_player_shoot_position_dataset()
+    ds.print_dataset_info()
+    print(ds.x[0])
+    # ds.scatter2d()
+    np.random.seed(3)
+    # learning_rate = 0.3, num_iterations = 30000, print_cost = True, lambd = 0, keep_prob = 1
+    dnn = Dnn([20, 3, 1], initialization="default", learning_rate=0.3, num_iterations=30000, print_cost=True, lambd=0,
+              keep_prob=0.86, cost_save_step=1000, cost_print_step=10000)
+    dnn.fit(ds.x, ds.y)
+    dnn.test(ds.x, ds.y, "train set")
+    dnn.test(ds.test_x, ds.test_y, "test set")
+    dnn.plot_decision_boundary(ds.x, ds.y)
+    # Cost after iteration 0: 0.6543912405149825
+    # Cost after iteration 10000: 0.0610169865749056
+    # Cost after iteration 20000: 0.060582435798513114
+    # Accuracy: 0.9289099526066351
+    # Accuracy: 0.9499999999999998
 
 
 if __name__ == '__main__':
     # ellipse_dnn_demo()
-    french_player_shoot_demo()
+    french_player_shoot_l2_demo()
+    # french_player_shoot_dropout_demo()
