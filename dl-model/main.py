@@ -118,7 +118,23 @@ def french_player_shoot_dropout_demo():
     # Accuracy: 0.9499999999999998
 
 
+def gradient_check_demo():
+    ds = dataset_loader.load_ellipse_dataset()
+
+    np.random.seed(3)
+    dnn = Dnn([10, 5, 1], num_iterations=15000, learning_rate=0.01, print_cost=False, cost_save_step=1000)
+    dnn.fit(ds.x, ds.y)
+    # dnn.plot_decision_boundary(ds.x, ds.y)
+    # dnn.test(ds.x, ds.y, "train set")
+    # dnn.test(ds.test_x, ds.test_y, "test set")
+    # Cost after iteration 14000: 0.07357895962677363
+    # train set's Accuracy: 0.9933333333333335
+    # test set's Accuracy: 0.96
+    dnn.gradient_check(ds.x, ds.y)
+
+
 if __name__ == '__main__':
     # ellipse_dnn_demo()
-    french_player_shoot_l2_demo()
+    gradient_check_demo()
+    # french_player_shoot_l2_demo()
     # french_player_shoot_dropout_demo()

@@ -14,6 +14,14 @@ def show_img(img):
     plt.show()
 
 
+def __axis_adjustment(axis_min, axis_max):
+    length = axis_max - axis_min
+    if length < 3:
+        return axis_min - length / 10, axis_max + length / 10
+
+    return axis_min - 1, axis_max + 1
+
+
 def plot_decision_boundary(model, x, y):
     """
     根据样本输入 x 和样本标签 y 绘制决策边界
@@ -27,22 +35,9 @@ def plot_decision_boundary(model, x, y):
     # 求出纵坐标 x2 的最小值、最大值，确定 y 坐标轴范围
     y_min, y_max = x[:, 1].min(), x[:, 1].max()
 
-    # 如果数值区间较小，要特殊处理下边界
-    if x_min < 1 and x_max < 1:
-        length = x_max - x_min
-        x_min = x_min - length / 10
-        x_max = x_max + length / 10
-    else:
-        x_min -= 1
-        x_max += 1
-
-    if y_min < 1 and y_max < 1:
-        length = y_max - y_min
-        y_min = y_min - length / 10
-        y_max = y_max + length / 10
-    else:
-        y_min -= 1
-        y_max += 1
+    # 调整 x, y 方向的绘图边界
+    x_min, x_max = __axis_adjustment(x_min, x_max)
+    y_min, y_max = __axis_adjustment(y_min, y_max)
 
     h = 0.01
     # 使用 np.meshgrid 交叉生成网格数据矩阵，h 为步长，xx 为样本横坐标，yy 为样本纵坐标

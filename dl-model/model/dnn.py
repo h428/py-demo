@@ -5,15 +5,6 @@ import common.dataset_util as dataset_util
 import common.visualize_util as visualize_util
 
 
-def print_info(idx, caches, AL):
-    (_, (_, D1), _) = caches[0]
-    ((A1, _, _), (_, D2), _) = caches[1]
-    ((A2, _, _), (_, D2), _) = caches[2]
-    A3 = AL
-    # print("index %d, D1=%d, D2=%d" % (idx, np.sum(D1), np.sum(D2)))
-    print("index %d, A1=%f, A2=%f, A3=%f" % (idx, np.sum(A1), np.sum(A2), np.sum(A3)))
-
-
 class Dnn:
 
     def __init__(self, layers_dims, learning_rate=0.0075, num_iterations=3000, initialization="he", lambd=0,
@@ -66,6 +57,20 @@ class Dnn:
 
     def plot_decision_boundary(self, X, Y):
         visualize_util.plot_decision_boundary(lambda x: Dnn.predict(x.T, self.parameters).T, X, Y)
+
+    def gradient_check(self, X, Y):
+        """
+        基于当前的模型参数 parameters 和给定的数据进行梯度校验
+        @param X:
+        @param Y:
+        @return:
+        """
+        X, Y, m = dataset_util.dataset_stack_by_row_to_stack_by_column(X, Y)
+        AL, caches = Dnn.forward_propagation(X, self.parameters, 1.0)
+        gradients = Dnn.backward_propagation(AL, Y, caches, 0, 1.0)
+        n_x = X.shape[0]
+        layer_dims_with_nx = np.r_[n_x, self.layers_dims]
+        Dnn.static_gradient_check(self.parameters, X, Y, layer_dims_with_nx, gradients, 1.0, 0, epsilon=1e-7)
 
     @staticmethod
     def initialize_parameters(layer_dims_with_nx, initialization):
@@ -246,3 +251,54 @@ class Dnn:
         if dataset_name != "":
             dataset_name = dataset_name + "\'s "
         print("%sAccuracy: %s" % (dataset_name, str(np.sum((labels == Y) / m))))
+
+    @staticmethod
+    def static_gradient_check(parameters, X, Y, layer_dims_with_nx, gradients, keep_prob, lambd, epsilon=1e-7):
+        """
+        梯度校验
+        @param parameters: 参数字典
+        @param X: 输入样本
+        @param Y: 样本标签
+        @param layer_dims_with_nx: 网络描述
+        @param gradients: 梯度字典
+        @param keep_prob: dropout 保留概率
+        @param lambd: L2 正则化参数
+        @param epsilon: 微分 epsilon
+        @return:
+        """
+
+        theta = model_util.parameters_to_vector(parameters)
+        grad_theta = model_util.parameters_to_vector(gradients, op_type="gradients")
+        num_parameters = theta.shape[0]
+
+        # 使用 epsilon 计算偏微分的中间变量
+        J_plus = np.zeros((num_parameters, 1))
+        J_minus = np.zeros((num_parameters, 1))
+        grad_approx = np.zeros((num_parameters, 1))
+
+        # 对每个参数，拷贝一份 theta，然后使用 epsilon 计算偏微分
+        for i in range(num_parameters):
+            theta_plus = np.copy(theta)
+            theta_plus[i][0] = theta_plus[i][0] + epsilon
+            param = model_util.vector_to_dictionary(theta_plus, layer_dims_with_nx)
+            AL, _ = Dnn.forward_propagation(X, param, keep_prob)
+            J_plus[i] = model_util.compute_cross_entropy_cost_with_regularization(AL, Y, param, lambd)
+
+            theta_minus = np.copy(theta)
+            theta_minus[i][0] = theta_minus[i][0] - epsilon
+            param = model_util.vector_to_dictionary(theta_minus, layer_dims_with_nx)
+            AL, _ = Dnn.forward_propagation(X, param, keep_prob)
+            J_minus[i] = model_util.compute_cross_entropy_cost_with_regularization(AL, Y, param, lambd)
+
+            grad_approx[i] = (J_plus[i] - J_minus[i]) / (2 * epsilon)
+
+        numerator = np.linalg.norm(grad_theta - grad_approx)  # 计算分子
+        denominator = np.linalg.norm(grad_theta) + np.linalg.norm(grad_approx)  # 计算分母
+        difference = numerator / denominator  # 计算欧氏距离
+
+        if difference < 1e-7:
+            print("The gradient is correct!")
+        else:
+            print("The gradient is wrong!")
+
+        return difference

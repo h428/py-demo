@@ -24,6 +24,55 @@ def relu(z):
     return a
 
 
+def parameters_to_vector(parameters, op_type="parameters"):
+    """
+    将参数字典转化为列向量 theta
+    @param parameters:
+    @param op_type: 类型
+    @return:
+    """
+    L = len(parameters) // 2
+
+    if "gradients" == op_type:
+        L = (len(parameters) - 1) // 3
+
+    prefix = {"parameters": ["W", "b"], "gradients": ["dW", "db"]}
+
+    theta = np.array([]).reshape((-1, 1))
+    for l in range(1, L + 1):
+        key = prefix[op_type][0] + str(l)
+        new_vector = np.reshape(parameters[key], (-1, 1))
+        theta = np.concatenate((theta, new_vector), axis=0)
+        key = prefix[op_type][1] + str(l)
+        new_vector = np.reshape(parameters[key], (-1, 1))
+        theta = np.concatenate((theta, new_vector), axis=0)
+
+    return theta
+
+
+def vector_to_dictionary(theta, layer_dims_with_nx):
+    """
+    把单行的参数 theta 根据神经网络形状变回原有的参数字典
+    @param theta:
+    @param layer_dims_with_nx:
+    @return:
+    """
+    parameters = {}
+    L = len(layer_dims_with_nx) - 1
+
+    index_count = 0
+    for l in range(1, L + 1):
+        W_count = layer_dims_with_nx[l] * layer_dims_with_nx[l - 1]
+        parameters["W" + str(l)] = theta[index_count:index_count + W_count].reshape(
+            (layer_dims_with_nx[l], layer_dims_with_nx[l - 1]))
+        index_count += W_count
+        b_count = layer_dims_with_nx[l]
+        parameters["b" + str(l)] = theta[index_count:index_count + b_count].reshape((layer_dims_with_nx[l], 1))
+        index_count += b_count
+
+    return parameters
+
+
 def linear_forward(A, W, b):
     """
     实现单层的前向线性计算：Z[l] = np.dot(W[l], A[l-1]) + b[l]

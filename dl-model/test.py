@@ -34,8 +34,9 @@ def backward_propagation_with_regularization_test_case():
 
 
 if __name__ == '__main__':
-    X_assess, Y_assess, cache = backward_propagation_with_regularization_test_case()
-    grads = model_util.backward_propagation_with_regularization(X_assess, Y_assess, cache, lambd=0.7)
-    print("dW1 = " + str(grads["dW1"]))
-    print("dW2 = " + str(grads["dW2"]))
-    print("dW3 = " + str(grads["dW3"]))
+    x = np.random.randn(4, 3, 3, 2)
+    np.pad(X, ((0, 0), (pad, pad), (pad, pad)), 'constant', constant_values=(0, 0))
+    ndarray = np.pad(array, ((1, 1), (2, 2)), 'constant', constant_values=((0, 3), (5, 9)))
+
+    print("array", array)
+    print("ndarray=", ndarray)
